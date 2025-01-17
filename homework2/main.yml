@@ -1,0 +1,43 @@
+---
+- name: Linux-core update
+  hosts: otus-vm2, otus-vm3
+  become: true
+  tasks:
+
+  - name: place keyring from zabbly.com
+    ansible.builtin.get_url:
+     url: https://pkgs.zabbly.com/key.asc
+     dest: /etc/apt/keyrings/zabbly.asc
+
+  - name: add apt source
+    ansible.builtin.command:
+     cmd: |
+      sh -c 'cat <<EOF > /etc/apt/sources.list.d/zabbly-kernel-stable.sources
+      Enabled: yes
+      Types: deb
+      URIs: https://pkgs.zabbly.com/kernel/stable
+      Suites: $(. /etc/os-release && echo ${VERSION_CODENAME})
+      Components: main
+      Architectures: $(dpkg --print-architecture)
+      Signed-By: /etc/apt/keyrings/zabbly.asc
+      EOF'
+
+     creates: /etc/apt/sources.list.d/zabbly-kernel-stable.sources
+
+  - name: update apt
+    ansible.builtin.apt:
+     update_cache: true
+
+  - name: install linux-core
+    ansible.builtin.apt:
+     name: linux-zabbly
+     state: latest
+    register: result_upd_core
+
+
+  - name: reboot after update linux-core
+    ansible.builtin.shell: shutdown -r -t 10
+    when: result_upd_core is changed
+
+...
+
