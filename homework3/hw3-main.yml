@@ -1,0 +1,53 @@
+---
+- name: Install and configure
+
+  hosts: otus-vm2
+  become: true
+  vars:
+   nginx_listen_port: 8080
+  tasks:
+
+  - name: update repos
+    ansible.builtin.apt:
+     update_cache: true
+    tags: apt-update
+
+  - name: NGINX | install package
+    ansible.builtin.apt:
+     name: nginx
+     state: latest
+    tags: nginx-install
+    notify:
+     - restart nginx
+
+  - name: NGINX | copy template
+    ansible.builtin.template:
+     src: templates/nginx.conf.j2
+     dest: /etc/nginx/nginx.conf
+    tags: nginx-configuration
+    notify:
+     - reload nginx
+
+  handlers:
+  - name: restart nginx
+    ansible.builtin.systemd:
+     name: nginx
+     state: restarted
+     enabled: yes
+
+  - name: reload nginx
+    ansible.builtin.systemd:
+     name: nginx
+     state: reloaded
+
+#  - name: show1
+#    ansible.builtin.debug:
+#     msg: "{{result_apt}}"
+
+
+  # - name: reboot after update linux-core
+    # ansible.builtin.shell: shutdown -r -t 10
+    # when: result_upd_core is changed
+
+...
+
