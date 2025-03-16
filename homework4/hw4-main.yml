@@ -1,24 +1,113 @@
 ---
+
 - name: mdadm
 
   hosts: otus-vm2
   become: true
+  vars:
+    array_name: 'md0'
+    array_fs: 'ext4'
+    part_set:
+      - name: 'p1'
+        params:
+          - p_number: '1'
+            p_start: '0%'
+            p_end: '20%'
+            p_fs: 'ext4'
+            p_type: 'primary'
 
-  roles:
-    - role: ansible-mdadm
+      - name: 'p2'
+        params:
+          - p_number: '2'
+            p_start: '20%'
+            p_end: '40%'
+            p_fs: 'ext4'
+            p_type: 'primary'
+
+      - name: 'p3'
+        params:
+          - p_number: '3'
+            p_start: '40%'
+            p_end: '60%'
+            p_fs: 'ext4'
+            p_type: 'primary'
+
+      - name: 'p4'
+        params:
+          - p_number: '4'
+            p_start: '60%'
+            p_end: '80%'
+            p_fs: 'ext4'
+            p_type: 'primary'
+
+      - name: 'p5'
+        params:
+          - p_number: '5'
+            p_start: '80%'
+            p_end: '100%'
+            p_fs: 'ext4'
+            p_type: 'primary'
+
+  tasks:
+    - name: umount parts if array_state is absent
+      ansible.posix.mount:
+        path: '/mnt/raid/{{ item.name }}'
+        state: absent
+      loop: '{{ part_set }}'
+      when: array_state is defined and array_state == "absent"
+
+    - name: role for mdadm-ansible
+      include_role:
+        name: ansible-mdadm
       vars:
         mdadm_arrays:
-          - name: 'md0'
+          - name: '{{ array_name }}'
             devices:
               - '/dev/sdb'
               - '/dev/sdc'
               - '/dev/sdd'
               - '/dev/sde'
-            filesystem: 'ext4'
+#            filesystem: '{{ array_fs }}'
             level: '5'
-            mountpoint: '/mnt/0/'
+#            mountpoint: '/mnt/0/'
             state: '{{ array_state | default("present") }}'
 
 
+    - name: create partitions
+      community.general.parted:
+        device: /dev/'{{ array_name }}'
+        label: 'gpt'
+        name: '{{ item.0.name }}'
+        number: '{{ item.1.p_number }}'
+        fs_type: '{{ item.1.p_fs }}'
+        part_start: '{{ item.1.p_start }}'
+        part_end: '{{ item.1.p_end }}'
+        part_type: '{{ item.1.p_type }}'
+        state: present
+      with_subelements:
+        - '{{ part_set }}'
+        - params
+      when: array_state is not defined or array_state == "present"
+
+    - name: make FS
+      community.general.filesystem:
+        dev: '/dev/{{ array_name }}{{ item.name }}'
+        fstype: ext4
+        state: present
+      loop: '{{ part_set }}'
+      when: array_state is not defined or array_state == "present"
+
+    - name: mount parts
+      ansible.posix.mount:
+        path: '/mnt/raid/{{ item.name }}'
+        src: '/dev/{{ array_name }}{{ item.name }}'
+        fstype: ext4
+        state: mounted
+      loop: '{{ part_set }}'
+      when: array_state is not defined or array_state == "present"
+
+
 ...
+
+
 
