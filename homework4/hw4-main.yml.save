@@ -1,0 +1,27 @@
+---
+- name: mdadm
+
+  hosts: otus-vm2
+  become: true
+#  vars:
+  roles: 
+    - role: ansible-mdadm
+  tasks:
+
+  - name: update repos
+    ansible.builtin.apt:
+     update_cache: true
+    tags: apt-update
+
+  - name: mdadm | install package
+    ansible.builtin.apt:
+     name: mdadm
+     state: latest
+    tags: mdadm-install
+
+- name: mdadm | create array
+  include_role:
+    name: mdadm
+
+...
+
